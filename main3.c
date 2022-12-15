@@ -56,6 +56,7 @@ int main(int argc, char* argv[]){
     readLine(config, expected);
     close(config);
 
+    char* asPath = strcat(exc1, "allStudents");
     //we will insert the content that ls returns on allStudents into a file to read from
     const char* arguments[] = {"ls", exc1, NULL};
     // arguments[0] = (char*)malloc(strlen("ls") + 1);
