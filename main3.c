@@ -9,7 +9,20 @@
 
 #define SIZE 50
 
-int readLne(int fd);
+//this function gets a file descriptor and a char address and writes to the var
+int readLine(int fd, char* line){
+    char c;
+    int i = 0;
+    while(read(fd, &c, 1) > 0){
+        if(c == '\n') break;
+
+        line[i] = c;
+        i++;
+    }
+    if(i == 0) return -1;
+    line[i] = '\0';
+    return i;
+}
 
 //TODO: making sure the error writes writes to the CLI 
 int main(int argc, char* argv[]){
@@ -58,12 +71,10 @@ int main(int argc, char* argv[]){
 
     char* asPath = strcat(exc1, "allStudents");
     //we will insert the content that ls returns on allStudents into a file to read from
-    const char* arguments[] = {"ls", exc1, NULL};
-    // arguments[0] = (char*)malloc(strlen("ls") + 1);
-    // strcpy(arguments[0], "ls");
-    // arguments[0] = (char*)malloc(strlen(allStudents) + 1);
-    // strcpy(arguments[1], allStudents);
-    // arguments[2] = NULL;
+    char* arguments[10];
+    arguments[0] = (char*)malloc(strlen(asPath) + 1);
+    strcpy(arguments[0], asPath);
+    arguments[1] = NULL;
 
     //creating a new proccess
     pid_t pid;
@@ -78,7 +89,7 @@ int main(int argc, char* argv[]){
         dup2(studentsListFile, 1); //now instead of writing to the screen, we'll write to the file given 
         ret_code = execvp("ls", arguments);
         if(ret_code == -1){
-            write(2, "execvp failed\n", 50);
+            write(2, "execvp failed line 76\n", 50);
             exit(-1);
         }
     }else{
@@ -111,70 +122,83 @@ int main(int argc, char* argv[]){
     while(studentsListFile != EOF){
         char* path = strdup(exc1);
         //reading a name from the studentListFile
-        char* name[SIZE];
+        char* name;
         readLine(studentsListFile, name);
 
         //creating a new proccess
         pid_t pid;
-        int stat;
+        int ret_code, stat;
         if((pid = fork()) < 0){
             write(2, "fork failed\n", 50);
             exit(-1);
         }
         if(pid == 0){ //the son proccess
-            int ret_code, stat;
             close(1); //closing stdout
             int fdOutput = open("output.txt", O_WRONLY | O_RDONLY | O_CREAT, 0666);
+            if(fdOutput < 0){
+                write(2, "output.txt file didn't open", 50);
+                exit(-1);
+            }
+            close(1);
             int stdOutCopy = dup(1); //making a copy of fd 1
             dup2(fdOutput, 1); //now instead of writing to the screen, we'll write to the file given
             char* prePath = strcat(strcat(path, "allStudents/"), name);
             char* finalPath = strcat(prePath, "/main.exe");
-            char* args = {firstInput, secondInput, NULL};
+
+            char* args[10];
+            args[0] = (char*)malloc(strlen(firstInput) + 1);
+            strcpy(args[0], firstInput);
+            args[1] = (char*)malloc(strlen(secondInput) + 1);
+            strcpy(args[1], secondInput);
+            args[2] = NULL;
             ret_code = execvp(finalPath, args);
             if(ret_code == -1){
-                write(2, "execvp failed, line 134\n", 50);
+                write(2, "execvp failed, line 135\n", 50);
+            }
+            free(prePath);
+            free(finalPath);
+        }else{ //father
+            wait(&stat);
+            if(stat != 0){
+                write(2, "student main.exe failed\n", 50);
+                write(2, "grade: 0\n", 50);
+                write(resultFile, name, strlen(name) + 1);
+                write(resultFile, ",0\n", 6);
+                exit(-1);
             }
 
             //performing a comparison between the output and the expected output with comp.out
-            
-            args = {"output.txt", "configure/expected.txt", NULL};
-            ret_code = execvp("./comp.out", args);
-            if(ret_code == -1){
-                write(2, "execvp failed, line 142\n", 50);
-            }
+            char* args[10];
+            args[0] = (char*)malloc(strlen("output.txt") + 1);
+            strcpy(args[0], "output.txt");
+            args[1] = (char*)malloc(strlen("configure/expected.txt") + 1);
+            strcpy(args[1], "configure/expected.txt");
+            args[2] = NULL;
 
-            free(args);
-            free(prePath);
-            free(finalPath);
-        }else{
-            wait(&stat);
-            if(stat != 0){
-                write(2, "wait failed\n", 50);
+            //creating a new proccess
+            if((pid = fork()) < 0){
+                write(2, "fork failed\n", 50);
                 exit(-1);
             }
+            if(pid == 0){// son
+                ret_code = execvp("./comp.out", args);
+                if(ret_code == -1){
+                    write(2, "comp execvp failed, line 142\n", 50);
+                    exit(-1);
+                }
+            }else { //father
+                wait(&stat);
+                if(stat / 256 == 2){
+                    write(resultFile, name, strlen(name) + 1);
+                    write(resultFile, ",100\n", 6);
+                }else{
+                    write(resultFile, name, strlen(name) + 1);
+                    write(resultFile, ",0\n", 4);
+                }
+            }
         }
-
         free(path);
         free(name);
     }
-
-
-
-
-}
-
-
-//this function gets a file descriptor and a char address and writes to the var
-int readLine(int fd, char* line){
-    char c;
-    int i = 0;
-    while(read(fd, &c, 1) > 0){
-        if(c == '\n') break;
-
-        line[i] = c;
-        i++;
-    }
-    if(i == 0) return -1;
-    line[i] = '\0';
-    return line;
+    return 1;
 }
