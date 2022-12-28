@@ -37,13 +37,13 @@ int main(int argc, char* argv[]){
 
     //if creating result file failed
     if(resultFile < 0){
-        write(2, "results.csv file didn't open", 50);
+        write(2, "results.csv file didn't open\n", 50);
         exit(-1);
     }
 
     int studentsListFile = open("studentsList.txt", O_WRONLY | O_RDONLY | O_CREAT, 0666);
     if(studentsListFile < 0){
-        write(2, "students list file didn't open", 50);
+        write(2, "students list file didn't open\n", 50);
         exit(-1);
     }
 
@@ -69,13 +69,12 @@ int main(int argc, char* argv[]){
     readLine(config, expected);
     close(config);
 
-    char* asPath = strcat(exc1, "allStudents");
+    char* asPath = (char*)malloc(50*sizeof(char));
+    strcpy(asPath,exc1);
+    strcat(asPath, "allStudents");
     //we will insert the content that ls returns on allStudents into a file to read from
-    char* arguments[10];
-    arguments[0] = (char*)malloc(strlen(asPath) + 1);
-    strcpy(arguments[0], asPath);
-    arguments[1] = NULL;
-
+    char* arguments[] = {"ls", asPath, NULL};
+   // free(asPath);
     //creating a new proccess
     pid_t pid;
     int stat;
@@ -84,121 +83,118 @@ int main(int argc, char* argv[]){
         exit(-1);
     }
     if(pid == 0){ //the son proccess
-        int ret_code, stat;
+        int ret_code, stat; 
         close(1); //closing stdout
-        dup2(studentsListFile, 1); //now instead of writing to the screen, we'll write to the file given 
-        ret_code = execvp("ls", arguments);
+        dup(studentsListFile); //now instead of writing to the screen, we'll write to the file given 
+        close(studentsListFile);
+        ret_code = execvp(arguments[0], arguments);
         if(ret_code == -1){
             write(2, "execvp failed line 76\n", 50);
             exit(-1);
         }
     }else{
-        wait(&stat);
-        if(stat != 0){
-            write(2, "wait failed\n", 50);
-            exit(-1);
-        }
+        wait(NULL);
     }
     //reading from studentsListFile
     studentsListFile = open("studentsList.txt", O_RDONLY);
     if(studentsListFile < 0){
-        write(2, "studentsList.txt file didn't open", 50);
+        write(2, "studentsList.txt file didn't open\n", 60);
         exit(-1);
     }
     
     //reading from input the two parameter arguments
-    int fdInput = open("configure/input.txt", O_RDONLY);
-    if(fdInput < 0){
-        write(2, "input.txt file didn't open", 50);
-        exit(-1);
-    }
+    int fdInputText = open(input, O_RDONLY);
+   
 
     //saving the two parameters
-    char* firstInput,secondInput;
-    readLine(fdInput, firstInput);
-    readLine(fdInput, secondInput);
+    char inputBuffer[50] = { 0 };
+    readLine(fdInputText, inputBuffer);
+    char *token1, *token2;
+    token1 = strtok(inputBuffer, " ");
+    token2 = strtok(NULL, " ");
+    
 
-    //running a while loop that runs on the studentsListFile and perfoms comparison for their exe output
-    while(studentsListFile != EOF){
-        char* path = strdup(exc1);
-        //reading a name from the studentListFile
-        char* name;
-        readLine(studentsListFile, name);
+    // //running a while loop that runs on the studentsListFile and perfoms comparison for their exe output
+    // while(studentsListFile != EOF){
+    //     char* path = strdup(exc1);
+    //     //reading a name from the studentListFile
+    //     char* name;
+    //     readLine(studentsListFile, name);
 
-        //creating a new proccess
-        pid_t pid;
-        int ret_code, stat;
-        if((pid = fork()) < 0){
-            write(2, "fork failed\n", 50);
-            exit(-1);
-        }
-        if(pid == 0){ //the son proccess
-            close(1); //closing stdout
-            int fdOutput = open("output.txt", O_WRONLY | O_RDONLY | O_CREAT, 0666);
-            if(fdOutput < 0){
-                write(2, "output.txt file didn't open", 50);
-                exit(-1);
-            }
-            close(1);
-            int stdOutCopy = dup(1); //making a copy of fd 1
-            dup2(fdOutput, 1); //now instead of writing to the screen, we'll write to the file given
-            char* prePath = strcat(strcat(path, "allStudents/"), name);
-            char* finalPath = strcat(prePath, "/main.exe");
+    //     //creating a new proccess
+    //     pid_t pid;
+    //     int ret_code, stat;
+    //     if((pid = fork()) < 0){
+    //         write(2, "fork failed\n", 50);
+    //         exit(-1);
+    //     }
+    //     if(pid == 0){ //the son proccess
+    //         close(1); //closing stdout
+    //         int fdOutput = open("output.txt", O_WRONLY | O_RDONLY | O_CREAT, 0666);
+    //         if(fdOutput < 0){
+    //             write(2, "output.txt file didn't open", 50);
+    //             exit(-1);
+    //         }
+    //         close(1);
+    //         int stdOutCopy = dup(1); //making a copy of fd 1
+    //         dup2(fdOutput, 1); //now instead of writing to the screen, we'll write to the file given
+    //         char* prePath = strcat(strcat(path, "allStudents/"), name);
+    //         char* finalPath = strcat(prePath, "/main.exe");
 
-            char* args[10];
-            args[0] = (char*)malloc(strlen(firstInput) + 1);
-            strcpy(args[0], firstInput);
-            args[1] = (char*)malloc(strlen(secondInput) + 1);
-            strcpy(args[1], secondInput);
-            args[2] = NULL;
-            ret_code = execvp(finalPath, args);
-            if(ret_code == -1){
-                write(2, "execvp failed, line 135\n", 50);
-            }
-            free(prePath);
-            free(finalPath);
-        }else{ //father
-            wait(&stat);
-            if(stat != 0){
-                write(2, "student main.exe failed\n", 50);
-                write(2, "grade: 0\n", 50);
-                write(resultFile, name, strlen(name) + 1);
-                write(resultFile, ",0\n", 6);
-                exit(-1);
-            }
+    //         char* args[10];
+    //         args[0] = (char*)malloc(strlen(firstInput) + 1);
+    //         strcpy(args[0], firstInput);
+    //         args[1] = (char*)malloc(strlen(secondInput) + 1);
+    //         strcpy(args[1], secondInput);
+    //         args[2] = NULL;
+    //         ret_code = execvp(finalPath, args);
+    //         if(ret_code == -1){
+    //             write(2, "execvp failed, line 135\n", 50);
+    //         }
+    //         free(prePath);
+    //         free(finalPath);
+    //     }else{ //father
+    //         wait(&stat);
+    //         if(stat != 0){
+    //             write(2, "student main.exe failed\n", 50);
+    //             write(2, "grade: 0\n", 50);
+    //             write(resultFile, name, strlen(name) + 1);
+    //             write(resultFile, ",0\n", 6);
+    //             exit(-1);
+    //         }
 
-            //performing a comparison between the output and the expected output with comp.out
-            char* args[10];
-            args[0] = (char*)malloc(strlen("output.txt") + 1);
-            strcpy(args[0], "output.txt");
-            args[1] = (char*)malloc(strlen("configure/expected.txt") + 1);
-            strcpy(args[1], "configure/expected.txt");
-            args[2] = NULL;
+    //         //performing a comparison between the output and the expected output with comp.out
+    //         char* args[10];
+    //         args[0] = (char*)malloc(strlen("output.txt") + 1);
+    //         strcpy(args[0], "output.txt");
+    //         args[1] = (char*)malloc(strlen("configure/expected.txt") + 1);
+    //         strcpy(args[1], "configure/expected.txt");
+    //         args[2] = NULL;
 
-            //creating a new proccess
-            if((pid = fork()) < 0){
-                write(2, "fork failed\n", 50);
-                exit(-1);
-            }
-            if(pid == 0){// son
-                ret_code = execvp("./comp.out", args);
-                if(ret_code == -1){
-                    write(2, "comp execvp failed, line 142\n", 50);
-                    exit(-1);
-                }
-            }else { //father
-                wait(&stat);
-                if(stat / 256 == 2){
-                    write(resultFile, name, strlen(name) + 1);
-                    write(resultFile, ",100\n", 6);
-                }else{
-                    write(resultFile, name, strlen(name) + 1);
-                    write(resultFile, ",0\n", 4);
-                }
-            }
-        }
-        free(path);
-        free(name);
-    }
-    return 1;
+    //         //creating a new proccess
+    //         if((pid = fork()) < 0){
+    //             write(2, "fork failed\n", 50);
+    //             exit(-1);
+    //         }
+    //         if(pid == 0){// son
+    //             ret_code = execvp("./comp.out", args);
+    //             if(ret_code == -1){
+    //                 write(2, "comp execvp failed, line 142\n", 50);
+    //                 exit(-1);
+    //             }
+    //         }else { //father
+    //             wait(&stat);
+    //             if(stat / 256 == 2){
+    //                 write(resultFile, name, strlen(name) + 1);
+    //                 write(resultFile, ",100\n", 6);
+    //             }else{
+    //                 write(resultFile, name, strlen(name) + 1);
+    //                 write(resultFile, ",0\n", 4);
+    //             }
+    //         }
+    //     }
+    //     free(path);
+    //     free(name);
+    // }
+    exit(1);
 }
